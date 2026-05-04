@@ -58,3 +58,38 @@ class AnkiClient:
             return self._invoke("retrieveMediaFile", filename=filename)
         except AnkiConnectError:
             return None
+
+    def store_media_file(self, filename: str, b64: str) -> None:
+        self._invoke("storeMediaFile", filename=filename, data=b64)
+
+    def model_names(self) -> list[str]:
+        return list(self._invoke("modelNames"))
+
+    def create_model(
+        self,
+        name: str,
+        fields: list[str],
+        css: str,
+        templates: list[dict[str, str]],
+    ) -> Any:
+        return self._invoke(
+            "createModel",
+            modelName=name,
+            inOrderFields=fields,
+            css=css,
+            cardTemplates=templates,
+        )
+
+    def create_deck(self, name: str) -> int:
+        return int(self._invoke("createDeck", deck=name))
+
+    def add_notes(self, notes: list[dict[str, Any]]) -> list[int | None]:
+        """Returns list of note IDs (None for failures), in order."""
+        return list(self._invoke("addNotes", notes=notes))
+
+    def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
+        self._invoke("updateNoteFields", note={"id": note_id, "fields": fields})
+
+    def delete_notes(self, note_ids: list[int]) -> None:
+        if note_ids:
+            self._invoke("deleteNotes", notes=note_ids)

@@ -88,8 +88,42 @@ def pull(deck_filter: str | None, side: str) -> None:
 
 @cli.command()
 def diff() -> None:
-    """Show pending changes per side without writing. (Phase 3+)"""
-    console.print("[yellow]Not implemented yet — lands in Phase 3.[/]")
+    """Show pending changes per side without writing. (Phase 6)"""
+    console.print("[yellow]Not implemented yet — lands in Phase 6.[/]")
+
+
+@cli.command()
+@click.option("--deck", "deck_filter", default=None, help="Only push this deck name.")
+@click.option(
+    "--to",
+    "destination",
+    type=click.Choice(["anki", "brainscape"]),
+    default="anki",
+    help="Push direction.",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would happen without writing.")
+def push(deck_filter: str | None, destination: str, dry_run: bool) -> None:
+    """Push pending changes to a destination (phase 3: BS→Anki adds only)."""
+    from .anki.client import AnkiClient
+    from .brainscape.client import BrainscapeClient
+    from .push_anki import push_brainscape_to_anki
+    from .snapshot import snapshot_brainscape
+
+    if destination == "brainscape":
+        console.print("[yellow]Anki → Brainscape lands in Phase 5.[/]")
+        return
+
+    cfg = _load_config_or_exit()
+    decks = cfg.deck if deck_filter is None else [d for d in cfg.deck if d.name == deck_filter]
+    if not decks:
+        console.print(f"[red]No deck matching {deck_filter!r} in config.[/]")
+        raise SystemExit(1)
+
+    with BrainscapeClient.from_state_dir() as bs, AnkiClient(cfg.anki.connect_url) as anki:
+        for deck in decks:
+            console.print(f"[bold]{deck.name}[/]")
+            bs_snap = snapshot_brainscape(bs, deck)
+            push_brainscape_to_anki(anki, deck, bs_snap, dry_run=dry_run)
 
 
 @cli.command()

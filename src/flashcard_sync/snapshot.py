@@ -36,6 +36,8 @@ def snapshot_brainscape(client: BrainscapeClient, deck: DeckConfig) -> dict[str,
             "brainscape_card_id": int(c["cardId"]),
             "front": front.model_dump(),
             "back": back.model_dump(),
+            "front_html": c.get("questionHtml") or "",
+            "back_html": c.get("answerHtml") or "",
             "updated_at": c.get("updatedAt"),
         })
     return {
