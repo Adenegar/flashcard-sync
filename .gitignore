@@ -1,0 +1,28 @@
+# Local sync state, credentials, caches
+.sync-state/
+.env
+*.session
+*.cookies
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# User-specific synced config (commit sync.config.toml.example as reference)
+sync.config.toml
+
+
+# Claude Code local state
+.claude/

@@ -1,0 +1,22 @@
+# Copy to sync.config.toml and edit. Only listed decks will be synced.
+
+[anki]
+connect_url = "http://127.0.0.1:8765"
+
+[brainscape]
+# Captured by `sync auth brainscape`. Stored at .sync-state/brainscape.session.
+# Do not put credentials here.
+
+[[deck]]
+name = "Spanish Vocab"
+brainscape_pack_id = "12345"
+brainscape_deck_id = "67890"
+anki_deck = "Languages::Spanish::Vocab"
+direction = "two-way"   # one of: two-way, bs-to-anki, anki-to-bs
+
+# [[deck]]
+# name = "Anatomy"
+# brainscape_pack_id = "..."
+# brainscape_deck_id = "..."
+# anki_deck = "Med::Anatomy"
+# direction = "bs-to-anki"
