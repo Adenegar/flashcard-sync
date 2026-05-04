@@ -51,11 +51,39 @@ def add_deck() -> None:
 
 
 @cli.command()
-def pull() -> None:
-    """Fetch current state from Brainscape and Anki into .sync-state/. (Phase 2)"""
+@click.option("--deck", "deck_filter", default=None, help="Only pull this deck name.")
+@click.option("--side", type=click.Choice(["both", "brainscape", "anki"]), default="both")
+def pull(deck_filter: str | None, side: str) -> None:
+    """Fetch current state from Brainscape and Anki into .sync-state/."""
+    from .anki.client import AnkiClient
+    from .brainscape.client import BrainscapeClient
+    from .snapshot import snapshot_anki, snapshot_brainscape, write_snapshot
+
     cfg = _load_config_or_exit()
-    console.print(f"Loaded config with {len(cfg.deck)} deck(s).")
-    console.print("[yellow]pull not implemented yet — lands in Phase 2.[/]")
+    decks = cfg.deck if deck_filter is None else [d for d in cfg.deck if d.name == deck_filter]
+    if not decks:
+        console.print(f"[red]No deck matching {deck_filter!r} in config.[/]")
+        raise SystemExit(1)
+
+    bs_client = BrainscapeClient.from_state_dir() if side in ("both", "brainscape") else None
+    anki_client = AnkiClient(cfg.anki.connect_url) if side in ("both", "anki") else None
+
+    try:
+        for deck in decks:
+            console.print(f"[bold]{deck.name}[/]")
+            if bs_client is not None:
+                snap = snapshot_brainscape(bs_client, deck)
+                path = write_snapshot("brainscape", deck, snap)
+                console.print(f"  brainscape: {snap['card_count']} cards → {path}")
+            if anki_client is not None:
+                snap = snapshot_anki(anki_client, deck)
+                path = write_snapshot("anki", deck, snap)
+                console.print(f"  anki:       {snap['card_count']} cards → {path}")
+    finally:
+        if bs_client is not None:
+            bs_client.close()
+        if anki_client is not None:
+            anki_client.close()
 
 
 @cli.command()
