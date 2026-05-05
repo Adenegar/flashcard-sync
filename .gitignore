@@ -26,3 +26,6 @@ sync.config.toml
 
 # Claude Code local state
 .claude/
+
+# Card content (private; never push to public remotes)
+decks/
