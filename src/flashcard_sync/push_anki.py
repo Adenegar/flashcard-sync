@@ -91,6 +91,34 @@ def push_brainscape_to_anki(
     )
     canonical_by_bs = {c.brainscape_card_id: c for c in canonical.cards if c.brainscape_card_id}
 
+    # Rebuild canonical entries for cards that exist in Anki but not in the local
+    # canonical store (e.g. after deleting decks/ to scrub it from git history).
+    rebuilt = 0
+    bs_by_id = {bsc["brainscape_card_id"]: bsc for bsc in bs_snapshot["cards"]}
+    for bs_id, note in existing.items():
+        if bs_id in canonical_by_bs:
+            continue
+        bs_card = bs_by_id.get(bs_id)
+        if bs_card is None:
+            continue  # in Anki but not in BS anymore — leave for delete pass in phase 6
+        sync_id = note.get("fields", {}).get("SyncID", {}).get("value") or str(uuid.uuid4())
+        card = Card(
+            sync_id=sync_id,
+            front=CardFace(**bs_card["front"]),
+            back=CardFace(**bs_card["back"]),
+            brainscape_card_id=bs_id,
+            anki_note_id=int(note["noteId"]),
+        )
+        h = card.content_hash()
+        card.last_seen_brainscape_hash = h
+        card.last_seen_anki_hash = h
+        canonical.cards.append(card)
+        canonical_by_bs[bs_id] = card
+        rebuilt += 1
+    if rebuilt:
+        store.save(canonical)
+        console.print(f"  [dim]rebuilt {rebuilt} canonical entr{'y' if rebuilt == 1 else 'ies'} from Anki[/]")
+
     to_add: list[tuple[str, dict[str, Any]]] = []  # (sync_id, bs_card)
     for bs_card in bs_snapshot["cards"]:
         bs_id = bs_card["brainscape_card_id"]
