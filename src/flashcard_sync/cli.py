@@ -39,9 +39,57 @@ def auth() -> None:
 
 
 @auth.command("brainscape")
-def auth_brainscape() -> None:
-    """Capture a Brainscape Pro session cookie. (Phase 2)"""
-    console.print("[yellow]Not implemented yet — lands in Phase 2.[/]")
+@click.option(
+    "--curl-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Read the cURL command from a file instead of the clipboard.",
+)
+def auth_brainscape(curl_file: Path | None) -> None:
+    """Capture a Brainscape session cookie via 'Copy as cURL'."""
+    import re
+    import subprocess
+
+    if curl_file is None:
+        console.print(
+            "Capture your Brainscape session cookie:\n"
+            "  1. Sign in at https://www.brainscape.com in your browser.\n"
+            "  2. Open DevTools (Cmd+Opt+I) → Network tab.\n"
+            "  3. Check 'Preserve log' and filter by 'Doc'.\n"
+            "  4. Hard reload (Cmd+Shift+R).\n"
+            "  5. Right-click any brainscape.com row → Copy → Copy as cURL.\n"
+        )
+        click.pause(info="Press any key once you've copied the cURL command…")
+        try:
+            text = subprocess.run(
+                ["pbpaste"], capture_output=True, text=True, check=True
+            ).stdout
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            console.print("[red]Couldn't read clipboard. Re-run with --curl-file PATH.[/]")
+            raise SystemExit(1)
+    else:
+        text = curl_file.read_text()
+
+    match = re.search(r"-H \$?'[Cc]ookie:\s*([^']+)'", text) or re.search(
+        r"-b \$?'([^']+)'", text
+    )
+    if not match:
+        console.print("[red]No Cookie header found in that input.[/]")
+        raise SystemExit(1)
+
+    cookie = match.group(1).strip()
+    names = {p.strip().split("=", 1)[0] for p in cookie.split(";") if "=" in p}
+    has_session = any("_Brainscape_session" in n for n in names)
+
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    path = STATE_DIR / "brainscape.cookie.txt"
+    path.write_text(cookie)
+    path.chmod(0o600)
+
+    msg = f"Saved {len(names)} cookie(s) to {path}."
+    if not has_session:
+        console.print(f"[yellow]{msg} Warning: no _Brainscape_session cookie — auth may fail.[/]")
+    else:
+        console.print(f"[green]{msg}[/]")
 
 
 @cli.command("add-deck")
