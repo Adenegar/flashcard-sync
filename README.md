@@ -44,9 +44,24 @@ brainscape.com/flashcards/<slug>-<DECK_ID>/packs/<PACK_ID>
 
 Anki desktop must be running while these commands execute — AnkiConnect is an in-process HTTP server inside Anki, so the desktop app needs to be open and unlocked.
 
-- `sync pull` — snapshot both sides into `.sync-state/` without writing anything. Useful for inspecting what's currently on each side. Add `--side brainscape` or `--side anki` to limit, or `--deck "Name"` to scope to one deck.
-- `sync push --to anki` — add cards that exist on Brainscape but not yet in Anki. Idempotent: re-running won't duplicate cards. Pair with `--dry-run` first to see the plan, and `--deck "Name"` to scope.
-- After a successful `sync push`, click **Sync** in Anki desktop to propagate to AnkiWeb and your other devices. The tool only writes to your local Anki collection.
+Snapshot both sides into `.sync-state/` without writing anything. Useful for inspecting what's currently on each side:
+
+```bash
+sync pull
+sync pull --side brainscape           # only one side
+sync pull --side anki
+sync pull --deck "Name"               # scope to one deck
+```
+
+Add cards that exist on Brainscape but not yet in Anki. Idempotent — re-running won't duplicate cards:
+
+```bash
+sync push --to anki --dry-run         # preview the plan first
+sync push --to anki
+sync push --to anki --deck "Name"     # scope to one deck
+```
+
+After a successful `sync push`, click **Sync** in Anki desktop to propagate to AnkiWeb and your other devices. The tool only writes to your local Anki collection.
 
 Current scope: BS → Anki **adds only**. Edits, deletes, and the Anki → Brainscape direction aren't implemented yet.
 
