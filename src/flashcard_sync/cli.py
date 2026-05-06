@@ -38,45 +38,33 @@ def auth() -> None:
     """Manage credentials for external services."""
 
 
+_BROWSERS = ["chrome", "safari", "firefox", "edge", "brave", "chromium", "arc", "opera", "vivaldi"]
+
+
 @auth.command("brainscape")
+@click.option(
+    "--browser",
+    type=click.Choice(_BROWSERS),
+    help="Browser whose cookie store to read. Required unless --curl-file is given.",
+)
 @click.option(
     "--curl-file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Read the cURL command from a file instead of the clipboard.",
+    help="Fallback: read cookie from a 'Copy as cURL' dump instead of the browser.",
 )
-def auth_brainscape(curl_file: Path | None) -> None:
-    """Capture a Brainscape session cookie via 'Copy as cURL'."""
-    import re
-    import subprocess
-
-    if curl_file is None:
-        console.print(
-            "Capture your Brainscape session cookie:\n"
-            "  1. Sign in at https://www.brainscape.com in your browser.\n"
-            "  2. Open DevTools (Cmd+Opt+I) → Network tab.\n"
-            "  3. Check 'Preserve log' and filter by 'Doc'.\n"
-            "  4. Hard reload (Cmd+Shift+R).\n"
-            "  5. Right-click any brainscape.com row → Copy → Copy as cURL.\n"
-        )
-        click.pause(info="Press any key once you've copied the cURL command…")
-        try:
-            text = subprocess.run(
-                ["pbpaste"], capture_output=True, text=True, check=True
-            ).stdout
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            console.print("[red]Couldn't read clipboard. Re-run with --curl-file PATH.[/]")
-            raise SystemExit(1)
+def auth_brainscape(browser: str | None, curl_file: Path | None) -> None:
+    """Pull the Brainscape session cookie straight from your browser."""
+    if curl_file is not None:
+        cookie = _cookie_from_curl(curl_file.read_text())
     else:
-        text = curl_file.read_text()
+        if browser is None:
+            console.print(
+                "[red]Specify --browser to avoid prompting every Chromium-based browser's keychain.[/]\n"
+                f"Choices: {', '.join(_BROWSERS)}"
+            )
+            raise SystemExit(2)
+        cookie = _cookie_from_browser(browser)
 
-    match = re.search(r"-H \$?'[Cc]ookie:\s*([^']+)'", text) or re.search(
-        r"-b \$?'([^']+)'", text
-    )
-    if not match:
-        console.print("[red]No Cookie header found in that input.[/]")
-        raise SystemExit(1)
-
-    cookie = match.group(1).strip()
     names = {p.strip().split("=", 1)[0] for p in cookie.split(";") if "=" in p}
     has_session = any("_Brainscape_session" in n for n in names)
 
@@ -90,6 +78,48 @@ def auth_brainscape(curl_file: Path | None) -> None:
         console.print(f"[yellow]{msg} Warning: no _Brainscape_session cookie — auth may fail.[/]")
     else:
         console.print(f"[green]{msg}[/]")
+
+
+def _cookie_from_browser(browser: str) -> str:
+    try:
+        import browser_cookie3 as bc3
+    except ImportError:
+        console.print("[red]browser-cookie3 not installed. Run `uv pip install -e .` to refresh deps.[/]")
+        raise SystemExit(1)
+
+    fn = getattr(bc3, browser, None)
+    if fn is None:
+        console.print(f"[red]browser-cookie3 has no loader for {browser!r}.[/]")
+        raise SystemExit(1)
+    try:
+        jar = fn(domain_name="brainscape.com")
+    except Exception as e:
+        console.print(
+            f"[red]Couldn't read {browser} cookies: {e}[/]\n"
+            "On macOS Chromium-based browsers may prompt for Keychain access on the first run."
+        )
+        raise SystemExit(1)
+
+    cookies = [c for c in jar if "brainscape.com" in (c.domain or "")]
+    if not cookies:
+        console.print(
+            "[red]No brainscape.com cookies found. "
+            "Sign in at https://www.brainscape.com first, then re-run.[/]"
+        )
+        raise SystemExit(1)
+    return "; ".join(f"{c.name}={c.value}" for c in cookies)
+
+
+def _cookie_from_curl(text: str) -> str:
+    import re
+
+    match = re.search(r"-H \$?'[Cc]ookie:\s*([^']+)'", text) or re.search(
+        r"-b \$?'([^']+)'", text
+    )
+    if not match:
+        console.print("[red]No Cookie header found in that cURL dump.[/]")
+        raise SystemExit(1)
+    return match.group(1).strip()
 
 
 @cli.command("add-deck")
