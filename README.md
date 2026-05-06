@@ -10,7 +10,8 @@ Install and scaffold the local config + state directories:
 git clone https://github.com/Adenegar/flashcard-sync.git
 cd flashcard-sync
 uv venv && uv pip install -e ".[dev]"
-.venv/bin/sync init
+source .venv/bin/activate
+sync init
 ```
 
 ### Authenticate to Brainscape
@@ -18,7 +19,7 @@ uv venv && uv pip install -e ".[dev]"
 Brainscape has no public API, so this tool reuses the session cookie from a browser you've already signed in with. Sign in to https://www.brainscape.com in your browser of choice and leave the tab open, then run:
 
 ```bash
-.venv/bin/sync auth brainscape --browser firefox
+sync auth brainscape --browser firefox
 ```
 
 `--browser` is required — picking one avoids prompting every installed browser's keychain. Supported: `chrome`, `safari`, `firefox`, `edge`, `brave`, `chromium`, `arc`, `opera`, `vivaldi`.
@@ -34,7 +35,15 @@ If the browser route fails (locked profile, unusual setup, etc.), fall back to a
 
 ### Configure decks
 
-Edit `sync.config.toml` to add the decks you want to sync. Each deck needs its own `[[deck]]` table (TOML's array-of-tables syntax). Find the IDs in the Brainscape URL:
+The easiest path is the interactive picker, which lists your Brainscape library and appends a `[[deck]]` block to `sync.config.toml` for the deck you choose:
+
+```bash
+sync add-deck
+```
+
+It prompts for a class, then a deck within it, then the local name, the Anki target deck, and the sync direction. Run it again for each deck you want to sync.
+
+If you'd rather edit `sync.config.toml` by hand, each deck needs its own `[[deck]]` table (TOML's array-of-tables syntax). The IDs are in the Brainscape URL:
 
 ```
 brainscape.com/flashcards/<slug>-<DECK_ID>/packs/<PACK_ID>

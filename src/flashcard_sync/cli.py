@@ -124,8 +124,90 @@ def _cookie_from_curl(text: str) -> str:
 
 @cli.command("add-deck")
 def add_deck() -> None:
-    """Interactively add a deck to sync.config.toml. (Phase 2)"""
-    console.print("[yellow]Not implemented yet — lands in Phase 2.[/]")
+    """Interactively pick a Brainscape deck and append it to sync.config.toml."""
+    import questionary
+
+    from .brainscape.client import BrainscapeClient
+
+    cfg = _load_config_or_exit()
+    existing = {(d.brainscape_pack_id, d.brainscape_deck_id) for d in cfg.deck}
+
+    with BrainscapeClient.from_state_dir() as bs:
+        packs = bs.list_packs()
+        if not packs:
+            console.print("[red]No packs found in your Brainscape library.[/]")
+            raise SystemExit(1)
+
+        pack_choice = questionary.select(
+            "Pick a class/pack:",
+            choices=[
+                questionary.Choice(
+                    title=f"{p['name']}  ({p['deckCount']} decks, {p['cardCount']} cards)",
+                    value=p,
+                )
+                for p in sorted(packs, key=lambda p: p["name"].lower())
+            ],
+        ).ask()
+        if pack_choice is None:
+            raise SystemExit(0)
+
+        decks = bs.list_decks(pack_choice["packId"])
+        if not decks:
+            console.print(f"[red]Pack {pack_choice['name']!r} has no decks.[/]")
+            raise SystemExit(1)
+
+        deck_choice = questionary.select(
+            f"Pick a deck from {pack_choice['name']!r}:",
+            choices=[
+                questionary.Choice(
+                    title=f"{d['name']}  ({len(d.get('cardIDs','').split(',')) if d.get('cardIDs') else 0} cards)",
+                    value=d,
+                )
+                for d in decks
+            ],
+        ).ask()
+        if deck_choice is None:
+            raise SystemExit(0)
+
+    pack_id = str(pack_choice["packId"])
+    deck_id = str(deck_choice["deckID"])
+    if (pack_id, deck_id) in existing:
+        console.print(f"[yellow]That deck is already in {CONFIG_PATH}; nothing to do.[/]")
+        return
+
+    default_name = _slugify_for_name(deck_choice["name"])
+    name = questionary.text(
+        "Local name for this deck (used for snapshot folders):", default=default_name
+    ).ask() or default_name
+    anki_deck = questionary.text(
+        "Anki deck to write into (use '::' for nested):",
+        default=f"{pack_choice['name']}::{deck_choice['name']}",
+    ).ask()
+    if not anki_deck:
+        raise SystemExit(0)
+    direction = questionary.select(
+        "Sync direction:",
+        choices=["two-way", "bs-to-anki", "anki-to-bs"],
+        default="two-way",
+    ).ask()
+    if direction is None:
+        raise SystemExit(0)
+
+    block = (
+        "\n[[deck]]\n"
+        f'name = "{name}"\n'
+        f'brainscape_pack_id = "{pack_id}"\n'
+        f'brainscape_deck_id = "{deck_id}"\n'
+        f'anki_deck = "{anki_deck}"\n'
+        f'direction = "{direction}"\n'
+    )
+    with CONFIG_PATH.open("a", encoding="utf-8") as f:
+        f.write(block)
+    console.print(f"[green]Added {name!r} to {CONFIG_PATH}.[/]")
+
+
+def _slugify_for_name(s: str) -> str:
+    return s.replace("/", "-").replace("\\", "-").strip() or "deck"
 
 
 @cli.command()

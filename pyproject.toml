@@ -12,6 +12,7 @@ dependencies = [
     "tomli-w>=1.0",
     "rapidfuzz>=3.9",
     "browser-cookie3>=0.20",
+    "questionary>=2.0",
 ]
 
 [project.optional-dependencies]

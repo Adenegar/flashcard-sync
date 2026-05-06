@@ -46,6 +46,27 @@ class BrainscapeClient:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
+    def list_packs(self) -> list[dict]:
+        """Return the user's library of packs (classes)."""
+        r = self._client.get("/api/library")
+        if r.status_code in (401, 403):
+            raise BrainscapeAuthError(
+                f"Brainscape rejected the session cookie ({r.status_code}). "
+                "Run `sync auth brainscape --browser X` again."
+            )
+        r.raise_for_status()
+        return r.json().get("packs", [])
+
+    def list_decks(self, pack_id: str) -> list[dict]:
+        """Return the decks within a pack, including human-readable names."""
+        r = self._client.get(f"/api/packs/{pack_id}/decks")
+        if r.status_code in (401, 403):
+            raise BrainscapeAuthError(
+                f"Brainscape rejected the session cookie ({r.status_code})."
+            )
+        r.raise_for_status()
+        return r.json().get("decks", [])
+
     def deck_preview(self, pack_id: str, deck_id: str) -> dict:
         """Fetch a deck's full card list via the undocumented preview endpoint."""
         r = self._client.get(f"/api/packs/{pack_id}/decks/{deck_id}/preview")
